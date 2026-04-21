@@ -1,0 +1,1 @@
+npx ts-node src/convert-gpx-to-kml.ts coop_towpath_wpt-40.gpx coop_towpath_wpt-50.kml "Coop Towpath Trail Waypoints"

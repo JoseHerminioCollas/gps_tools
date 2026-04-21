@@ -1,0 +1,1 @@
+npx ts-node src/update-gpx-image.ts coop_towpath_wpt-20.gpx images/ coop_towpath_wpt-30.gpx
