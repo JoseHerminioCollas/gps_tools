@@ -2,9 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process";
 
-// Environment variables for source and destination
 const srcDir = process.env.SRC_DIR;
 const destDir = process.env.DEST_DIR;
 
@@ -15,7 +13,6 @@ if (!srcDir || !destDir) {
 
 fs.mkdirSync(destDir, { recursive: true });
 
-// Loop through GPX files
 const files = fs.readdirSync(srcDir).filter(f => f.endsWith(".gpx"));
 
 if (files.length === 0) {
@@ -28,45 +25,53 @@ files.forEach(file => {
   const inputPath = path.join(srcDir, file);
   const outputPath = path.join(destDir, `${base}.kml`);
 
-  console.log(`Converting ${inputPath} → ${outputPath}`);
+  console.log(`Processing ${inputPath} → ${outputPath}`);
+
   try {
-    // Step 1: Convert GPX → KML with gpsbabel
-    execSync(`gpsbabel -i gpx -f "${inputPath}" -o kml -F "${outputPath}"`, { stdio: "inherit" });
-
-    // Step 2: Read KML and normalize altitude to meters
-    let kml = fs.readFileSync(outputPath, "utf8");
-
-    kml = kml.replace(/<coordinates>(.*?)<\/coordinates>/gs, (m, coords) => {
-      const converted = coords.trim().split(/\s+/).map((line: string) => {
-        const [lon, lat, alt] = line.split(",");
-        const altMeters = (parseFloat(alt) / 3.28084).toFixed(2); // convert feet → meters
-        return `${lon},${lat},${altMeters}`;
-      }).join(" ");
-      return `<coordinates>${converted}</coordinates>`;
-    });
-
-    // Step 3: Extract start time from GPX
+    // Step 1: Read GPX file
     const gpx = fs.readFileSync(inputPath, "utf8");
-    const match = gpx.match(/<time>(.*?)<\/time>/);
-    const startTime = match ? match[1] : "Unknown Start";
 
-    // Step 4: Replace <Document> contents with a clean Placemark
-    kml = kml.replace(/<Document>[\s\S]*<\/Document>/, `
-<Document>
-  <Placemark>
-    <name>${startTime}</name>
-    <LineString>
-      <tessellate>1</tessellate>
-      ${kml.match(/<coordinates>[\s\S]*<\/coordinates>/) || ""}
-    </LineString>
-  </Placemark>
-</Document>`);
+    // Step 2: Extract all trackpoints (lat, lon, ele)
+    const trkptRegex = /<trkpt lat="([^"]+)" lon="([^"]+)">[\s\S]*?<ele>([^<]+)<\/ele>/g;
+    let coords: string[] = [];
+    let match;
+    while ((match = trkptRegex.exec(gpx)) !== null) {
+      const lat = match[1];
+      const lon = match[2];
+      const ele = match[3];
+      coords.push(`${lon},${lat},${ele}`);
+    }
 
-    fs.writeFileSync(outputPath, kml, "utf8");
-    console.log(`✅ Clean KML written: ${outputPath}`);
+    if (coords.length === 0) {
+      console.error(`⚠️ No trackpoints found in ${file}, skipping.`);
+      return;
+    }
+
+    // Step 3: Extract start time
+    const timeMatch = gpx.match(/<time>(.*?)<\/time>/);
+    const startTime = timeMatch ? timeMatch[1] : "Unknown Start";
+
+    // Step 4: Build minimal KML with full path
+    const cleanKml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <name>${startTime}</name>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>
+${coords.join("\n")}
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>`;
+
+    fs.writeFileSync(outputPath, cleanKml, "utf8");
+    console.log(`✅ KML written: ${outputPath}`);
   } catch (err) {
-    console.error(`❌ Failed to convert ${file}:`, err);
+    console.error(`❌ Failed to process ${file}:`, err);
   }
 });
 
-console.log("🎉 Batch conversion complete.");
+console.log("🎉 Batch GPX → KML conversion complete.");
