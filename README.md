@@ -1,40 +1,84 @@
-# Working with GPX files and digital imagery
+# Working with GPX Files and Digital Imagery
 
-## gps_tools is a repository that has files to parse GPX files and associate digital images with the waypoints in the GPX files.
+## Overview
+The **gps_tools** repository provides utilities to parse GPX files, clean and enrich waypoint data, and associate digital images with waypoints. The final output is a **KML (Keyhole Markup Language)** file that can be opened in mapping software such as Google Earth to visualize a journey.
 
-The files and digital images are generated while the user is traveling. The GPS device records latitude and longitude coordinates as the user travels, called track points automatically. The user creates waypoints with the GPS device, manually. The user has the option of taking photos to associate with the created waypoint. Depending on the digital camera used there will be time and GPS data recorded in the metadata of the digital image. Currently the scripts do not use metadata from the digital image. An array that indicates the quantity of images to associate with a way point is provided to a script.
+- **Track points**: Recorded automatically by the GPS device while traveling.  
+- **Waypoints**: Created manually by the user.  
+- **Images**: Optionally taken at waypoints. Some cameras embed GPS/time metadata in EXIF, but current scripts rely on user‑provided arrays to associate images with waypoints.
 
-The final output of this process will create a .KML(Keyhole Markup Language) file that can be used in mapping software to create a map recording of the user's journey.
+## Scripts
+- **remove-duplicates.ts**  
+  Cleans duplicate waypoints created unintentionally at the same location.
 
-The files used to parse the GPX file.
+- **update-gpx-name.ts**  
+  Replaces default GPS waypoint names with latitude, longitude, and elevation for better display in mapping software.
 
-remove-duplicates.ts
+- **gpx-names-to-array.ts**  
+  Generates an array mapping waypoint names to the number of images to be associated.
 
-If the user non-intentionally creates multiple waypoints at the same location the file remove-duplicates can be used to clean these duplicate waypoints.
+- **update-gpx-image.ts**  
+  Uses the array to update GPX waypoints with image associations.
 
-update-gpx-name.ts
+## Introspection Utilities
+- **ogrinfo**  
 
-GPS devices will provide a default name to a way point. The script update-gpx-name will update the name of the waypoint with the latitude, longitude and elevation information. This information will be displayed in map software.
+```bash
+  ogrinfo -al -so hike.gpx
+```
 
-gpx-names-to-array.ts
+Summarizes tracks, waypoints, and feature counts.
 
-In order to update waypoints with image data an array that contains the name of the waypoint with the count of the images to be added must be generated. Once this array is created the user will associate the count of images that will be associated with the waypoint. This array will be provided to the script, update-gpx-image.ts 
+```bash
+grep -c "<trkpt" hike.gpx
+  ```
 
+Counts raw trackpoints in the XML.
 
-process GPX
+```bash
+gpsbabel -i gpx -f hike.gpx -o gpx -F /dev/null -V
+  ```
 
-1 remove duplicates
-remove-duplicates.ts
+Reports tracks, routes, and point counts.
 
-2 update names in GPS with full time
-update-gpx-names.ts
+## Simplification Utilities
 
-3 make array of waypoints and images associated with the waypoint
-gpx-names-to-array.ts
+- **ogrinfo**  
 
-4 use array to update GPX with images
-update-gpx-image.ts
+```bash
+ogr2ogr -f KML hike-simplified.kml hike.kml -simplify 0.00015
+  ```
 
-5 Convert GPX to KLM
+Reduces trackpoints to stay under Google Earth’s 10,000‑feature limit.
 
-6 review and update array
+- 0.0001° ≈ 11 m tolerance
+
+- 0.00015° ≈ 16 m tolerance
+
+- 0.0002° ≈ 22 m tolerance
+- 
+Adjust tolerance until feature count is acceptable.
+
+## Workflow
+
+1. Remove duplicates → remove-duplicates.ts
+
+2. Update waypoint names → update-gpx-name.ts
+
+3. Generate waypoint–image array → gpx-names-to-array.ts
+
+4. Associate images → update-gpx-image.ts
+
+5. Convert GPX → KML → gpsbabel or ogr2ogr
+
+6. Introspect and simplify → ogrinfo, grep, ogr2ogr -simplify
+
+7. Review and update array → adjust image associations or metadata
+
+## Notes
+
+- Tolerance values in ogr2ogr -simplify are in decimal degrees (~0.0001° ≈ 11 m).
+
+- Google Earth limits: Map Features imports are capped at 10,000 features. Use Data Layers for larger datasets.
+
+- Images: Current scripts rely on user‑defined arrays, not EXIF metadata.
