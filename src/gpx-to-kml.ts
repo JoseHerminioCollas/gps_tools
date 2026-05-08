@@ -1,4 +1,8 @@
 // gpx-to-kml.ts
+// convert gpx to kml input, file or folder, output, target folder
+// example run script
+// npx ts-node src/gpx-to-kml.ts ~/projects/apu-linli/gpx ~/projects/apu-linli/kml_test/
+
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";

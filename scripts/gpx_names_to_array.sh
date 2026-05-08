@@ -1,1 +1,0 @@
-npx ts-node src/gpx-names-to-array.ts coop_towpath_wpt-20.gpx gpx_array.json
