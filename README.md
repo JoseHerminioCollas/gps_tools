@@ -20,6 +20,44 @@ The **gps_tools** repository provides utilities to parse GPX files, clean and en
 - **update-gpx-image.ts**  
   Uses the array to update GPX waypoints with image associations.
 
+
+# GPX to KML Conversion Tools
+
+## Overview
+This repository includes TypeScript scripts for converting GPX files into KML format. These tools allow you to either generate full KML files with metadata or produce simplified path‑only KMLs for lightweight visualization.
+
+
+## Files
+
+- **gpx-to-kml.ts**  
+  Converts GPX files into full KML outputs.  
+  - Accepts either a single GPX file or a directory of GPX files.  
+  - Creates the destination folder if it does not exist.  
+  - Output filenames mirror the GPX input names, with `.kml` extension.  
+  - Internally calls `gpsbabel` via Node’s `child_process` for reliable conversion.  
+  - Preserves metadata such as waypoints, trackpoints, and timestamps.
+
+- **gpx-to-kml-path.ts**  
+  Produces a simplified KML containing only the path geometry.  
+  - Strips out metadata and attributes, leaving just the track line.  
+  - Useful for lightweight visualization when only the route shape is needed.  
+  - Accepts single GPX files or directories, mirroring input filenames.  
+  - Creates destination folder if missing.  
+  - Output is minimal, optimized for display in Google Earth or other mapping tools.
+
+## Usage
+
+Run with `ts-node`:
+
+```bash
+# Full GPX → KML conversion
+npx ts-node src/gpx-to-kml.ts ./gpx/trek1.gpx ./kml
+```
+```bash
+# Path-only conversion
+npx ts-node src/gpx-to-kml-path.ts ./gpx/trek1.gpx ./kml
+```
+
 ## Introspection Utilities
 - **ogrinfo**  
 
@@ -51,12 +89,12 @@ ogr2ogr -f KML hike-simplified.kml hike.kml -simplify 0.00015
 
 Reduces trackpoints to stay under Google Earth’s 10,000‑feature limit.
 
-- 0.0001° ≈ 11 m tolerance
+- 0.0001° ≈ 11 meters tolerance
 
-- 0.00015° ≈ 16 m tolerance
+- 0.00015° ≈ 16 meters tolerance
 
-- 0.0002° ≈ 22 m tolerance
-- 
+- 0.0002° ≈ 22 meters tolerance
+  
 Adjust tolerance until feature count is acceptable.
 
 ## Workflow
