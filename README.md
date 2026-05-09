@@ -7,6 +7,63 @@ The **gps_tools** repository provides utilities to parse GPX files, clean and en
 - **Waypoints**: Created manually by the user.  
 - **Images**: Optionally taken at waypoints. Some cameras embed GPS/time metadata in EXIF, but current scripts rely on user‑provided arrays to associate images with waypoints.
 
+# Trek Data Workflow
+
+## 1. Convert `.fit` → `.gpx`
+Use **gpsbabel** or Garmin tools to convert raw FIT files into GPX format.
+
+<code>gpsbabel -i garmin_fit -f hike.fit -o gpx -F hike.gpx</code>
+
+Output: `hike.gpx` containing trackpoints and waypoints.
+
+---
+
+## 2. Convert `.gpx` → `.kml`
+Use your TypeScript wrapper (`gpx-to-kml.ts`) or direct gpsbabel call.
+
+<code>npx ts-node src/gpx-to-kml.ts ./gpx/hike.gpx ./kml</code>
+
+Output: `hike.kml` with full metadata (waypoints, trackpoints, timestamps).
+
+---
+
+## 3. Analyze `.kml`
+Run the **analyze.ts** utility to inspect feature counts at different simplification tolerances.
+
+<code>npx ts-node analyze.ts ./kml/hike.kml 0.0001 0.00015 0.0002</code>
+
+Console output example:
+<code>
+Analyzing: hike.kml
+Full (no simplify) → Features: 20015
+Tolerance 0.0001 → Features: 18050
+Tolerance 0.00015 → Features: 12050
+Tolerance 0.0002 → Features: 9500
+</code>
+
+---
+
+## 4. Modify `.kml`
+Apply simplification with `ogr2ogr` or your **simplify.ts** script until feature count ≤10,000.
+
+<code>npx ts-node simplify.ts ./kml/hike.kml ./simplified</code>
+
+Output: `hike-simplified.kml` with adjusted tolerance.
+
+Optional modifications:
+- **remove-duplicates.ts** → clean duplicate waypoints  
+- **update-gpx-name.ts** → rename waypoints with lat/long/elevation  
+- **update-gpx-image.ts** → associate images with waypoints  
+
+---
+
+## Summary
+1. **Convert FIT → GPX**  
+2. **Convert GPX → KML**  
+3. **Analyze KML feature counts**  
+4. **Simplify/modify KML for Google Earth compatibility**
+
+
 ## Scripts
 - **remove-duplicates.ts**  
   Cleans duplicate waypoints created unintentionally at the same location.
