@@ -4,7 +4,7 @@
  * Purpose:
  *   Replace a section of <Point> Placemarks in the destination KML
  *   with coordinates spliced from the source KML, using start/end lat/lon.
- *   Ensures no leftover destination points remain in the slice.
+ *   Updates both the Point Placemarks and the LineString path.
  *
  * Usage:
  *   npx ts-node src/splice-kml.ts <sourceFile> <destFile> <startLat> <startLon> <endLat> <endLon> <targetFolder>
@@ -57,7 +57,7 @@ function findNearestIndex(coords: string[], lat: number, lon: number): number {
   return minIndex;
 }
 
-function replacePointsRange(
+function replacePointsAndLineString(
   destObj: any,
   splicedCoords: string[],
   startLat: number,
@@ -65,7 +65,7 @@ function replacePointsRange(
   endLat: number,
   endLon: number
 ) {
-  // Navigate into the actual Placemark array in the destination
+  // Get Placemark array
   let pmArray: any[] = [];
   if (Array.isArray(destObj.kml.Document.Folder?.Placemark)) {
     pmArray = destObj.kml.Document.Folder.Placemark;
@@ -97,18 +97,29 @@ function replacePointsRange(
 
   console.log(`Destination range: ${i1} → ${i2} (${i2 - i1 + 1} Placemarks)`);
 
-  // Remove the old slice directly from the actual array
+  // Remove old slice
   const removed = pmArray.splice(i1, i2 - i1 + 1);
   console.log(`Removed ${removed.length} old Placemarks`);
 
-  // Insert new spliced Placemarks
+  // Insert new Placemarks
   const newPlacemarks = splicedCoords.map((coord, idx) => ({
     name: `Spliced-${i1 + idx}`,
     Point: { coordinates: coord }
   }));
-
   pmArray.splice(i1, 0, ...newPlacemarks);
   console.log(`Inserted ${newPlacemarks.length} new Placemarks`);
+
+  // 🔑 Update LineString coordinates
+  const linePm = pmArray.find(pm => pm.LineString?.coordinates);
+  if (linePm) {
+    linePm.LineString.coordinates = pmArray
+      .filter(pm => pm.Point?.coordinates)
+      .map(pm => pm.Point.coordinates.trim())
+      .join(" ");
+    console.log(`Updated LineString with ${pmArray.filter(pm => pm.Point?.coordinates).length} coordinates`);
+  } else {
+    console.warn("No LineString found in destination KML");
+  }
 }
 
 function spliceKml(
@@ -136,7 +147,7 @@ function spliceKml(
   const splicedCoords = srcCoords.slice(i1, i2 + 1);
   console.log(`  Spliced section length: ${splicedCoords.length} points`);
 
-  replacePointsRange(destObj, splicedCoords, startLat, startLon, endLat, endLon);
+  replacePointsAndLineString(destObj, splicedCoords, startLat, startLon, endLat, endLon);
 
   const newKml = buildKml(destObj);
 
