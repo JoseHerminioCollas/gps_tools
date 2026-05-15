@@ -65,26 +65,24 @@ function replacePointsRange(
   endLat: number,
   endLon: number
 ) {
-  // Collect all Placemarks with Point
-  const placemarks: any[] = [];
-  function walk(node: any) {
-    if (!node) return;
-    if (Array.isArray(node)) node.forEach(walk);
-    else {
-      if (node.Placemark) {
-        const pmArray = Array.isArray(node.Placemark) ? node.Placemark : [node.Placemark];
-        placemarks.push(...pmArray.filter((pm: any) => pm.Point?.coordinates));
-      }
-      if (node.Folder) walk(node.Folder);
-    }
+  // Navigate into the actual Placemark array in the destination
+  let pmArray: any[] = [];
+  if (Array.isArray(destObj.kml.Document.Folder?.Placemark)) {
+    pmArray = destObj.kml.Document.Folder.Placemark;
+  } else if (Array.isArray(destObj.kml.Document.Placemark)) {
+    pmArray = destObj.kml.Document.Placemark;
+  } else {
+    console.error("No Placemark array found in destination KML");
+    return;
   }
-  walk(destObj.kml?.Document);
 
   // Find nearest indices in destination
   function nearestIndex(lat: number, lon: number): number {
     let minDist = Infinity, idx = -1;
-    for (let i = 0; i < placemarks.length; i++) {
-      const [cLon, cLat] = placemarks[i].Point.coordinates.split(",").map(parseFloat);
+    for (let i = 0; i < pmArray.length; i++) {
+      const pm = pmArray[i];
+      if (!pm.Point?.coordinates) continue;
+      const [cLon, cLat] = pm.Point.coordinates.split(",").map(parseFloat);
       const dLat = cLat - lat;
       const dLon = cLon - lon;
       const dist = dLat * dLat + dLon * dLon;
@@ -99,8 +97,8 @@ function replacePointsRange(
 
   console.log(`Destination range: ${i1} → ${i2} (${i2 - i1 + 1} Placemarks)`);
 
-  // Remove the old slice completely
-  const removed = placemarks.splice(i1, i2 - i1 + 1);
+  // Remove the old slice directly from the actual array
+  const removed = pmArray.splice(i1, i2 - i1 + 1);
   console.log(`Removed ${removed.length} old Placemarks`);
 
   // Insert new spliced Placemarks
@@ -109,7 +107,7 @@ function replacePointsRange(
     Point: { coordinates: coord }
   }));
 
-  placemarks.splice(i1, 0, ...newPlacemarks);
+  pmArray.splice(i1, 0, ...newPlacemarks);
   console.log(`Inserted ${newPlacemarks.length} new Placemarks`);
 }
 
