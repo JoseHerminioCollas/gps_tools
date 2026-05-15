@@ -65,62 +65,98 @@ function replacePointsAndLineString(
   endLat: number,
   endLon: number
 ) {
-  // Get Placemark array
+  // Try to get Placemark array
   let pmArray: any[] = [];
   if (Array.isArray(destObj.kml.Document.Folder?.Placemark)) {
     pmArray = destObj.kml.Document.Folder.Placemark;
   } else if (Array.isArray(destObj.kml.Document.Placemark)) {
     pmArray = destObj.kml.Document.Placemark;
-  } else {
-    console.error("No Placemark array found in destination KML");
-    return;
   }
 
-  // Find nearest indices in destination
-  function nearestIndex(lat: number, lon: number): number {
-    let minDist = Infinity, idx = -1;
-    for (let i = 0; i < pmArray.length; i++) {
-      const pm = pmArray[i];
-      if (!pm.Point?.coordinates) continue;
-      const [cLon, cLat] = pm.Point.coordinates.split(",").map(parseFloat);
-      const dLat = cLat - lat;
-      const dLon = cLon - lon;
-      const dist = dLat * dLat + dLon * dLon;
-      if (dist < minDist) { minDist = dist; idx = i; }
+  if (pmArray.length > 0) {
+    // --- Case 1: Destination has Points ---
+    function nearestIndex(lat: number, lon: number): number {
+      let minDist = Infinity, idx = -1;
+      for (let i = 0; i < pmArray.length; i++) {
+        const pm = pmArray[i];
+        if (!pm.Point?.coordinates) continue;
+        const [cLon, cLat] = pm.Point.coordinates.split(",").map(parseFloat);
+        const dLat = cLat - lat;
+        const dLon = cLon - lon;
+        const dist = dLat * dLat + dLon * dLon;
+        if (dist < minDist) { minDist = dist; idx = i; }
+      }
+      return idx;
     }
-    return idx;
-  }
 
-  const startIndex = nearestIndex(startLat, startLon);
-  const endIndex = nearestIndex(endLat, endLon);
-  const [i1, i2] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+    const startIndex = nearestIndex(startLat, startLon);
+    const endIndex = nearestIndex(endLat, endLon);
+    const [i1, i2] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
 
-  console.log(`Destination range: ${i1} → ${i2} (${i2 - i1 + 1} Placemarks)`);
+    console.log(`Destination range: ${i1} → ${i2} (${i2 - i1 + 1} Placemarks)`);
 
-  // Remove old slice
-  const removed = pmArray.splice(i1, i2 - i1 + 1);
-  console.log(`Removed ${removed.length} old Placemarks`);
+    const removed = pmArray.splice(i1, i2 - i1 + 1);
+    console.log(`Removed ${removed.length} old Placemarks`);
 
-  // Insert new Placemarks
-  const newPlacemarks = splicedCoords.map((coord, idx) => ({
-    name: `Spliced-${i1 + idx}`,
-    Point: { coordinates: coord }
-  }));
-  pmArray.splice(i1, 0, ...newPlacemarks);
-  console.log(`Inserted ${newPlacemarks.length} new Placemarks`);
+    const newPlacemarks = splicedCoords.map((coord, idx) => ({
+      name: `Spliced-${i1 + idx}`,
+      Point: { coordinates: coord }
+    }));
+    pmArray.splice(i1, 0, ...newPlacemarks);
+    console.log(`Inserted ${newPlacemarks.length} new Placemarks`);
 
-  // 🔑 Update LineString coordinates
-  const linePm = pmArray.find(pm => pm.LineString?.coordinates);
-  if (linePm) {
-    linePm.LineString.coordinates = pmArray
-      .filter(pm => pm.Point?.coordinates)
-      .map(pm => pm.Point.coordinates.trim())
-      .join(" ");
-    console.log(`Updated LineString with ${pmArray.filter(pm => pm.Point?.coordinates).length} coordinates`);
+    // Update LineString if present
+    const linePm = pmArray.find(pm => pm.LineString?.coordinates);
+    if (linePm) {
+      linePm.LineString.coordinates = pmArray
+        .filter(pm => pm.Point?.coordinates)
+        .map(pm => pm.Point.coordinates.trim())
+        .join(" ");
+      console.log(`Updated LineString with ${pmArray.filter(pm => pm.Point?.coordinates).length} coordinates`);
+    }
   } else {
-    console.warn("No LineString found in destination KML");
+    // --- Case 2: Destination has only LineString ---
+    const linePm = destObj.kml.Document.Placemark?.LineString
+      ? destObj.kml.Document.Placemark
+      : destObj.kml.Document.Folder?.Placemark;
+
+    if (linePm?.LineString?.coordinates) {
+      const destCoords = linePm.LineString.coordinates.trim().split(/\s+/);
+
+      // Find nearest indices in the LineString
+      function nearestIndex(coords: string[], lat: number, lon: number): number {
+        let minDist = Infinity, idx = -1;
+        for (let i = 0; i < coords.length; i++) {
+          const [cLon, cLat] = coords[i].split(",").map(parseFloat);
+          const dLat = cLat - lat;
+          const dLon = cLon - lon;
+          const dist = dLat * dLat + dLon * dLon;
+          if (dist < minDist) { minDist = dist; idx = i; }
+        }
+        return idx;
+      }
+
+      const startIndex = nearestIndex(destCoords, startLat, startLon);
+      const endIndex = nearestIndex(destCoords, endLat, endLon);
+      const [i1, i2] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+
+      console.log(`Destination LineString range: ${i1} → ${i2} (${i2 - i1 + 1} coords)`);
+
+      // Replace only the slice, preserve before and after
+      const newCoords = [
+        ...destCoords.slice(0, i1),
+        ...splicedCoords,
+        ...destCoords.slice(i2 + 1)
+      ];
+
+      linePm.LineString.coordinates = newCoords.join(" ");
+      console.log(`LineString updated: ${newCoords.length} total coordinates`);
+    } else {
+      console.warn("No LineString found in destination KML");
+    }
   }
 }
+
 
 function spliceKml(
   sourceFile: string,
