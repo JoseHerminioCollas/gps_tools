@@ -26,13 +26,11 @@ function buildKml(obj: any): string {
 function addLineStringStyle(destObj: any, styleId: string = "lineStyle1") {
   // Define a style block (ABGR hex color: ff0000ff = opaque red)
   const styleBlock = {
-    Style: {
       "@_id": styleId,
       LineStyle: {
-        color: "ff00ff00", // green line
-        width: 14
+        color: "aaff0000", // green line
+        width: 2
       }
-    }
   };
 
   // Ensure Document.Style is an array
